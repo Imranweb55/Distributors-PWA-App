@@ -21,8 +21,12 @@ export const createMyCustomer = (payload) =>
 // amount) and an optional { finalIdlyKg, finalDosaKg } override (sent
 // when the distributor agrees to only request the shortfall after
 // stock is accounted for).
-export const submitBatterRequest = (customerOrders, { carryOverReason, finalIdlyKg, finalDosaKg } = {}) =>
-  axiosInstance.post("/api/batter-requests", { customerOrders, carryOverReason, finalIdlyKg, finalDosaKg }).then((r) => r.data);
+// UPDATED — now also accepts requestedDeliveryDate/requestedDeliveryTime
+// (which day/time the distributor wants this batter delivered — picked
+// on the new Request Batter flow), alongside the existing carryOverReason
+// and finalIdlyKg/finalDosaKg override.
+export const submitBatterRequest = (customerOrders, { carryOverReason, finalIdlyKg, finalDosaKg, requestedDeliveryDate, requestedDeliveryTime } = {}) =>
+  axiosInstance.post("/api/batter-requests", { customerOrders, carryOverReason, finalIdlyKg, finalDosaKg, requestedDeliveryDate, requestedDeliveryTime }).then((r) => r.data);
 
 export const getMyBatterRequests = () =>
   axiosInstance.get("/api/batter-requests/mine").then((r) => r.data);

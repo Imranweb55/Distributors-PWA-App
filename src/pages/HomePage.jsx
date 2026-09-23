@@ -1,20 +1,12 @@
 // FILE: src/pages/HomePage.jsx
-// UPDATED — Feature: real-time distributor workflow. Every number here
-// is now REAL, live data from your backend (no more DUMMY object):
-//   - getMyProfile()        → name, zone, current fridge stock
-//   - getMyDeliverySummary()→ today's margin/revenue/collections/credits,
-//                             and all-time totals — this is the exact
-//                             margin logic you asked for: margin is
-//                             computed on the backend per delivery as
-//                             (what the customer paid) − (what the
-//                             company charged the distributor for that
-//                             kg), snapshotted at delivery time.
-//   - getProducts()         → the per-kg company/customer rate card, so
-//                             the distributor can see exactly what
-//                             margin they make per kg of Idly/Dosa.
-//   - getMyDeliveries()     → today's delivered/skipped list.
-//   - getMyBatterRequests() → today's request + approval status.
-// The layout/styling is unchanged from before — only the data source.
+// UPDATED — Feature: e-commerce-style Request Batter flow. The old
+// step-wizard overlay (RequestBatterFlow) is REMOVED per your
+// instruction — "Request Batter" now just takes you to the Customers
+// tab, where you tap a customer to see their product cards (image, qty,
+// Add to Cart), build up a cart across multiple customers, and check
+// out from there (see CustomersPage.jsx / CheckoutPage.jsx). Everything
+// else here (margin, revenue, collections, credits, stock, rate card,
+// today's deliveries) is unchanged real backend data.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
@@ -28,7 +20,7 @@ import {
 } from "../api/distributorApi";
 
 const QUICK_ACTIONS = [
-  { label: "Request Batter", icon: "M12 4v16m8-8H4", path: "/orders" },
+  { label: "Request Batter", icon: "M12 4v16m8-8H4", path: "/customers" },
   { label: "Customers", icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0", path: "/customers" },
   { label: "Ledger", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z", path: "/ledger" },
   { label: "Deliveries", icon: "M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1", path: "/orders" },
@@ -64,7 +56,8 @@ export default function HomePage() {
   const [todayRequest, setTodayRequest] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadAll = () => {
+    setLoading(true);
     Promise.all([getMyProfile(), getMyDeliverySummary(), getProducts(), getMyDeliveries(), getMyBatterRequests()])
       .then(([p, s, pr, d, r]) => {
         setProfile(p.distributor);
@@ -74,7 +67,9 @@ export default function HomePage() {
         setTodayRequest((r.requests || [])[0] || null);
       })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadAll(); }, []);
 
   const displayName = profile?.name || authDistributor?.name || "Distributor";
   const hour = new Date().getHours();
@@ -167,12 +162,24 @@ export default function HomePage() {
               <p className="text-[12.5px] text-green-700/90 mt-1">
                 {todayRequest.requestedIdlyKg}kg idly / {todayRequest.requestedDosaKg}kg dosa requested — status: <b>{todayRequest.status.replace("_", " ")}</b>
               </p>
-              {todayRequest.deliveryTime && <p className="text-[12px] text-green-700/70 mt-0.5">Delivery time: {todayRequest.deliveryTime}</p>}
+              {todayRequest.requestedDeliveryDate && (
+                <p className="text-[12px] text-green-700/70 mt-0.5">
+                  Wanted by: {new Date(todayRequest.requestedDeliveryDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                  {todayRequest.requestedDeliveryTime && ` at ${todayRequest.requestedDeliveryTime}`}
+                </p>
+              )}
+              {todayRequest.deliveryTime && <p className="text-[12px] text-green-700/70 mt-0.5">Admin's delivery time: {todayRequest.deliveryTime}</p>}
             </>
           ) : (
             <p className="text-[12.5px] text-green-700/80 mt-1">You haven't requested batter today yet.</p>
           )}
-          <button onClick={() => navigate("/orders")} className="mt-3 px-4 py-2 bg-green-700 text-white rounded-xl text-xs font-semibold">
+          <button
+            onClick={() => navigate(todayRequest ? "/orders" : "/customers")}
+            className="mt-3 px-5 py-2.5 bg-green-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
             {todayRequest ? "Manage Today's Order" : "Request Batter"}
           </button>
         </div>
@@ -180,7 +187,11 @@ export default function HomePage() {
         <p className="font-bold text-gray-800 mb-3 px-1">Quick Actions</p>
         <div className="grid grid-cols-4 gap-2 mb-6">
           {QUICK_ACTIONS.map((a) => (
-            <button key={a.label} onClick={() => navigate(a.path)} className="flex flex-col items-center gap-1.5">
+            <button
+              key={a.label}
+              onClick={() => navigate(a.path)}
+              className="flex flex-col items-center gap-1.5"
+            >
               <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-700 flex items-center justify-center">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={a.icon} />
